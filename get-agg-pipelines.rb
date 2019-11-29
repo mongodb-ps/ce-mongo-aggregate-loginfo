@@ -47,11 +47,11 @@ end
 pipelines = {}
 
 ARGF.each do |line|
-  matches = line.match(/(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_msg (\d+)ms$)/)
+  matches = line.match(/(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_msg (\d+))ms$)/)
   unless matches.nil?
     if matches.length > 0
-      all, collection, pl, exec_time = matches.captures
-      pipeline = collection + "\t\t" + remove_in_clauses(match_square_brackets(pl))
+      all, namespace, aggregate, collection, pl, exec_time = matches.captures
+      pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
 
       if not pipelines.key?(pipeline)
         pipelines[pipeline] = Array(exec_time.to_f)
