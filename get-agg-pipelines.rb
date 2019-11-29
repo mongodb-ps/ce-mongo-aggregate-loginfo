@@ -1,4 +1,14 @@
 #
+class Stats
+  def initialize(num, max, tot, output)
+    @num = num
+    @max = max
+    @output = output
+    @total = tot
+  end
+  attr_reader :num, :max, :output, :total
+end
+
 def match_square_brackets(str)
   r_i = 0
   depth = 0
@@ -23,13 +33,15 @@ def remove_in_clauses(str)
   return str.gsub(/\$in:\s+\[[^\[\]]*\]/,'$in: [ <removed> ]')
 end
 
-def print_stats(pipeline, exec_times)
+def format_stats(pipeline, exec_times)
   exec_times.sort!
   min = exec_times[0]
   max = exec_times[exec_times.size - 1]
-  avg = exec_times.inject(0.0) { | sum, val | sum + val } / exec_times.size
+  tot = exec_times.inject(0.0) { | sum, val | sum + val }
+  avg = tot / exec_times.size
 
-  printf("%s\t\t\t%d\t%d\t%.2f\n", pipeline, min, max, avg)
+  output_line = sprintf("%s\t\t\t%d\t%d\t%.2f\t%d", pipeline, min, max, avg, tot)
+  return exec_times.size, max, tot, output_line
 end
 
 pipelines = {}
@@ -50,6 +62,11 @@ ARGF.each do |line|
   end
 end
 
-pipelines.each do |key, value|
-  print_stats(key, value)
+sorted_output = []
+pipelines.each do |pipeline, stats|
+  num_exec, max, tot, output = format_stats(pipeline, stats)
+  sorted_output.push(Stats.new(num_exec, max, tot, output))
 end
+
+sorted = sorted_output.sort_by { | element | element.total }.reverse!
+sorted.each { | element | printf("%d\t%s\n", element.num, element.output) }
