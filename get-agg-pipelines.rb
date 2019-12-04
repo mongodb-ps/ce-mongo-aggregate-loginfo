@@ -40,7 +40,7 @@ def format_stats(pipeline, exec_times)
   tot = exec_times.inject(0.0) { | sum, val | sum + val }
   avg = tot / exec_times.size
 
-  output_line = sprintf("%s\t\t\t%d\t%d\t%.2f\t%d", pipeline, min, max, avg, tot)
+  output_line = sprintf("%s\t\t\t\t%d\t%d\t%d\t%.2f\t%d", pipeline, exec_times.size, min, max, avg, tot)
   return exec_times.size, max, tot, output_line
 end
 
@@ -69,4 +69,5 @@ pipelines.each do |pipeline, stats|
 end
 
 sorted = sorted_output.sort_by { | element | element.total }.reverse!
-sorted.each { | element | printf("%d\t%s\n", element.num, element.output) }
+puts "Namespace\t\tpipeline\t\t\t\tcount\tmin\tmax\taverage\ttotal"
+sorted.each { | element | printf("%s\n",  element.output) }
