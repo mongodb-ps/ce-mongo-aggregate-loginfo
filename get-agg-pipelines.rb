@@ -47,11 +47,12 @@ end
 pipelines = {}
 
 ARGF.each do |line|
-  matches = line.match(/(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_msg (\d+))ms$)/)
+  matches = line.match(/(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_.+ (\d+))ms$)/)
   unless matches.nil?
     if matches.length > 0
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
-      pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
+      #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
+      pipeline = collection + "\t\t" + match_square_brackets(pl)
 
       if not pipelines.key?(pipeline)
         pipelines[pipeline] = Array(exec_time.to_f)
@@ -68,6 +69,6 @@ pipelines.each do |pipeline, stats|
   sorted_output.push(Stats.new(num_exec, max, tot, output))
 end
 
-sorted = sorted_output.sort_by { | element | element.total }.reverse!
+sorted = sorted_output.sort_by { | element | element.num }.reverse!
 puts "Namespace\t\tpipeline\t\t\t\tcount\tmin\tmax\taverage\ttotal"
 sorted.each { | element | printf("%s\n",  element.output) }
