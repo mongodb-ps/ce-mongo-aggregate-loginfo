@@ -1,3 +1,5 @@
+require 'json'
+
 #
 class Stats
   def initialize(num, max, tot, output)
@@ -44,6 +46,50 @@ def format_stats(pipeline, exec_times)
   return exec_times.size, max, tot, output_line
 end
 
+def quote_object_types(str)
+  return str.gsub(/(ObjectId\('[a-f0-9]+'\))/, '"\1"')
+end
+
+def quote_json_keys(str)
+  quoted_object_types = quote_object_types(str)
+  return quoted_object_types.gsub(/([a-zA-Z0-9_$\.]+):/, '"\1":')
+end
+
+def redact_innermost_parameters(pipeline)
+  retval = {}
+  if not pipeline.is_a?(Hash)
+    return pipeline
+  end
+  
+  pipeline.each do |k,v|
+    puts v
+    puts v.class
+    puts v.is_a?(Hash)
+    case v
+    when String
+      retval[k] = "redacted"
+
+    when Float
+      retval[k] = -0.0
+      
+    when Numeric
+      retval[k] = 0
+      
+    when Array
+      retarr = []
+      v.each { |v| retarr.push(redact_innermost_parameters(v)) }
+      retval[k] = retarr
+      
+    when Hash
+      retval[k] = redact_innermost_parameters(v)
+
+    else
+      retval[k] = "redacted parameters"
+    end
+  end
+  return retval
+end
+
 pipelines = {}
 
 ARGF.each do |line|
@@ -53,6 +99,12 @@ ARGF.each do |line|
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
       #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
       pipeline = collection + "\t\t" + match_square_brackets(pl)
+      puts pipeline
+      json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
+      puts(json_conv)
+      pl_hash = JSON.parse(json_conv)
+      puts pl_hash
+      puts redact_innermost_parameters(pl_hash)
 
       if not pipelines.key?(pipeline)
         pipelines[pipeline] = Array(exec_time.to_f)
