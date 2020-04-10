@@ -60,7 +60,7 @@ def in_clause?(key)
 end
 
 def dont_redact_val?(key)
-  return [ '$max', '$min', '$sum' ].include?(key)
+  return [ '$max', '$min', '$sum', '$avg' ].include?(key)
 end
 
 def redact_innermost_parameters(pipeline)
@@ -116,7 +116,13 @@ def redact_innermost_parameters(pipeline)
         retval[k] = retarr
       
       when Hash
-        retval[k] = redact_innermost_parameters(v)
+        # TODO: Needs to do partial redaction of $project in case
+        # we have subdocuments/subexpressions in it
+        if k == "$project"
+          retval[k] = v
+        else
+          retval[k] = redact_innermost_parameters(v)
+        end
       else
         retval[k] = "redacted parameters"
       end
