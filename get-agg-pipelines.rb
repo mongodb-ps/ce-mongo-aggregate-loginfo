@@ -110,15 +110,17 @@ end
 
 pipelines = {}
 
-overlength_line = Regexp.new('warning: log line attempted \(\d+kB\) over max size \(10kB\), printing beginning and end').freeze
-overlength_count = 0
+oversize_match = Regexp.new('warning: log line attempted \(\d+kB\) over max size \(10kB\), printing beginning and end').freeze
+oversize_count = 0
+
+pipeline_match = Regexp.new('(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_.+ (\d+))ms$)').freeze
 
 ARGF.each do |line|
-  matches = line.match(/(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_.+ (\d+))ms$)/)
+  matches = pipeline_match.match(line)
   unless matches.nil?
     if matches.length > 0
       #puts line
-      if not overlength_line.match?(line)
+      if not oversize_match.match?(line)
         all, namespace, aggregate, collection, pl, exec_time = matches.captures
         #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
         pipeline = collection + "\t\t" + match_square_brackets(pl)
@@ -135,13 +137,13 @@ ARGF.each do |line|
           pipelines[redacted_json].push(exec_time.to_f)
         end
       else
-        overlength_count += 1
+        oversize_count += 1
       end
     end
   end
 end
 
-printf "%d overlength lines detected that were skipped\n", overlength_count
+printf "%d overlength lines detected that were skipped\n", oversize_count
 
 sorted_output = []
 pipelines.each do |pipeline, stats|
