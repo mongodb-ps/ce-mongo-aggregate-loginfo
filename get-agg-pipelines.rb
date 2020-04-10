@@ -47,7 +47,7 @@ def format_stats(pipeline, exec_times)
 end
 
 def quote_object_types(str)
-  return str.gsub(/(ObjectId\('[a-f0-9]+'\))/, '"\1"')
+  return str.gsub(/(ObjectId\('[a-f0-9]+'\))/, '"\1"').gsub(/(new Date\(\d+\))/, '"\1"')
 end
 
 def quote_json_keys(str)
@@ -55,36 +55,54 @@ def quote_json_keys(str)
   return quoted_object_types.gsub(/([a-zA-Z0-9_$\.]+):/, '"\1":')
 end
 
+def partial_redaction_only?(key)
+  return [ '$eq', '$ne' ].include?(key)
+end
+  
+
 def redact_innermost_parameters(pipeline)
   retval = {}
   if not pipeline.is_a?(Hash)
-    return pipeline
-  end
-  
-  pipeline.each do |k,v|
-    puts v
-    puts v.class
-    puts v.is_a?(Hash)
-    case v
+    case pipeline
     when String
-      retval[k] = "redacted"
+      return "<redacted>"
 
     when Float
-      retval[k] = -0.0
-      
-    when Numeric
-      retval[k] = 0
-      
-    when Array
-      retarr = []
-      v.each { |v| retarr.push(redact_innermost_parameters(v)) }
-      retval[k] = retarr
-      
-    when Hash
-      retval[k] = redact_innermost_parameters(v)
+      return -0.0
 
-    else
-      retval[k] = "redacted parameters"
+    when Integer
+      return -0
+    end
+  else
+    pipeline.each do |k,v|
+      case v
+      when String
+        retval[k] = "redacted"
+
+      when Float
+        retval[k] = -0.0
+      
+      when Integer
+        retval[k] = 0
+
+      when Numeric
+        retval[k] = 0
+      
+      when Array
+        retarr = []
+        if partial_redaction_only?(k)
+          retarr.push(v[0])
+          v.drop(1).each { |val| retarr.push(redact_innermost_parameters(val)) }
+        else
+          v.each { |val| retarr.push(redact_innermost_parameters(val)) }
+        end
+        retval[k] = retarr
+      
+      when Hash
+        retval[k] = redact_innermost_parameters(v)
+      else
+        retval[k] = "redacted parameters"
+      end
     end
   end
   return retval
@@ -99,17 +117,17 @@ ARGF.each do |line|
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
       #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
       pipeline = collection + "\t\t" + match_square_brackets(pl)
-      puts pipeline
+      #puts pipeline
       json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
       puts(json_conv)
       pl_hash = JSON.parse(json_conv)
-      puts pl_hash
-      puts redact_innermost_parameters(pl_hash)
+      #puts pl_hash
+      redacted_json = collection + "\t\t" + redact_innermost_parameters(pl_hash).to_json
 
-      if not pipelines.key?(pipeline)
-        pipelines[pipeline] = Array(exec_time.to_f)
+      if not pipelines.key?(redacted_json)
+        pipelines[redacted_json] = Array(exec_time.to_f)
       else
-        pipelines[pipeline].push(exec_time.to_f)
+        pipelines[redacted_json].push(exec_time.to_f)
       end
     end
   end
