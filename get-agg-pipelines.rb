@@ -110,28 +110,38 @@ end
 
 pipelines = {}
 
+overlength_line = Regexp.new('warning: log line attempted \(\d+kB\) over max size \(10kB\), printing beginning and end').freeze
+overlength_count = 0
+
 ARGF.each do |line|
   matches = line.match(/(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_.+ (\d+))ms$)/)
   unless matches.nil?
     if matches.length > 0
-      all, namespace, aggregate, collection, pl, exec_time = matches.captures
-      #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
-      pipeline = collection + "\t\t" + match_square_brackets(pl)
-      #puts pipeline
-      json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
-      puts(json_conv)
-      pl_hash = JSON.parse(json_conv)
-      #puts pl_hash
-      redacted_json = collection + "\t\t" + redact_innermost_parameters(pl_hash).to_json
+      #puts line
+      if not overlength_line.match?(line)
+        all, namespace, aggregate, collection, pl, exec_time = matches.captures
+        #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
+        pipeline = collection + "\t\t" + match_square_brackets(pl)
+        #puts pipeline
+        json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
+        #puts(json_conv)
+        pl_hash = JSON.parse(json_conv)
+        #puts pl_hash
+        redacted_json = collection + "\t\t" + redact_innermost_parameters(pl_hash).to_json
 
-      if not pipelines.key?(redacted_json)
-        pipelines[redacted_json] = Array(exec_time.to_f)
+        if not pipelines.key?(redacted_json)
+          pipelines[redacted_json] = Array(exec_time.to_f)
+        else
+          pipelines[redacted_json].push(exec_time.to_f)
+        end
       else
-        pipelines[redacted_json].push(exec_time.to_f)
+        overlength_count += 1
       end
     end
   end
 end
+
+printf "%d overlength lines detected that were skipped\n", overlength_count
 
 sorted_output = []
 pipelines.each do |pipeline, stats|
