@@ -56,9 +56,16 @@ def quote_json_keys(str)
 end
 
 def partial_redaction_only?(key)
-  return [ '$eq', '$ne' ].include?(key)
+  return [ '$eq', '$ne', '$gte', '$gt', '$lte', '$lt' ].include?(key)
 end
   
+def in_clause?(key)
+  return key == "$in"
+end
+
+def dont_redact_val?(key)
+  return [ '$max', '$min', '$sum' ].include?(key)
+end
 
 def redact_innermost_parameters(pipeline)
   retval = {}
@@ -77,7 +84,11 @@ def redact_innermost_parameters(pipeline)
     pipeline.each do |k,v|
       case v
       when String
-        retval[k] = "redacted"
+        if dont_redact_val?(k)
+          retval[k] = v
+        else
+          retval[k] = "redacted"
+        end
 
       when Float
         retval[k] = -0.0
@@ -93,6 +104,16 @@ def redact_innermost_parameters(pipeline)
         if partial_redaction_only?(k)
           retarr.push(v[0])
           v.drop(1).each { |val| retarr.push(redact_innermost_parameters(val)) }
+        elsif in_clause?(k)
+          last_val = redact_innermost_parameters(v[0])
+          retarr.push(last_val)
+          v.drop(1).each do |val|
+            cur_val = redact_innermost_parameters(val)
+            if last_val != cur_val
+              last_val = cur_val
+              retarr.push(cur_val)
+            end
+          end
         else
           v.each { |val| retarr.push(redact_innermost_parameters(val)) }
         end
@@ -117,28 +138,26 @@ pipeline_match = Regexp.new('(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+a
 
 ARGF.each do |line|
   matches = pipeline_match.match(line)
-  unless matches.nil?
-    if matches.length > 0
-      #puts line
-      if not oversize_match.match?(line)
-        all, namespace, aggregate, collection, pl, exec_time = matches.captures
-        #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
-        pipeline = collection + "\t\t" + match_square_brackets(pl)
-        #puts pipeline
-        json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
-        #puts(json_conv)
-        pl_hash = JSON.parse(json_conv)
-        #puts pl_hash
-        redacted_json = collection + "\t\t" + redact_innermost_parameters(pl_hash).to_json
+  unless matches.nil? or matches.length == 0
+    #puts line
+    if not oversize_match.match?(line)
+      all, namespace, aggregate, collection, pl, exec_time = matches.captures
+      #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
+      pipeline = collection + "\t\t" + match_square_brackets(pl)
+      #puts pipeline
+      json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
+      #puts(json_conv)
+      pl_hash = JSON.parse(json_conv)
+      #puts pl_hash
+      redacted_json = collection + "\t\t" + redact_innermost_parameters(pl_hash).to_json
 
-        if not pipelines.key?(redacted_json)
-          pipelines[redacted_json] = Array(exec_time.to_f)
-        else
-          pipelines[redacted_json].push(exec_time.to_f)
-        end
+      if not pipelines.key?(redacted_json)
+        pipelines[redacted_json] = Array(exec_time.to_f)
       else
-        oversize_count += 1
+        pipelines[redacted_json].push(exec_time.to_f)
       end
+    else
+      oversize_count += 1
     end
   end
 end
