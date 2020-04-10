@@ -31,10 +31,6 @@ def match_square_brackets(str)
   return str[0..r_i]
 end
 
-def remove_in_clauses(str)
-  return str.gsub(/\$in:\s+\[[^\[\]]*\]/,'$in: [ <removed> ]')
-end
-
 def format_stats(pipeline, exec_times)
   exec_times.sort!
   min = exec_times[0]
@@ -142,7 +138,6 @@ ARGF.each do |line|
     #puts line
     if not oversize_match.match?(line)
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
-      #pipeline = namespace + "\t\t" + remove_in_clauses(match_square_brackets(pl))
       pipeline = collection + "\t\t" + match_square_brackets(pl)
       #puts pipeline
       json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
