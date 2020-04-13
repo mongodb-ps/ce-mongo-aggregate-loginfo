@@ -67,7 +67,7 @@ def format_stats(pipeline, exec_times, max_coll_name_len, max_pl_len)
 end
 
 def quote_object_types(str)
-  return str.gsub(/(ObjectId\('[a-f0-9]+'\))/, '"\1"').gsub(/(new Date\(\d+\))/, '"\1"')
+  return str.gsub(/((ObjectId\('[a-f0-9]+'\))|(new Date\(\d+\)))/, '"\1"')
 end
 
 def quote_json_keys(str)
@@ -75,52 +75,55 @@ def quote_json_keys(str)
   return quoted_object_types.gsub(/([a-zA-Z0-9_$\.]+):/, '"\1":')
 end
 
+
+# Expressions that should only be partially redacted, ie
+# redact the value but not the field the operation works on
 PART_REDACT = [ '$eq', '$ne', '$gte', '$gt', '$lte', '$lt' ]
 
 def partial_redaction_only?(key)
   return PART_REDACT.include?(key)
 end
-  
+
+# Check if we're in an in clause
 def in_clause?(key)
   return key == "$in"
 end
 
+# Usually these functions have fields as operands/values,
+# so don't redact them
 VAL_OK = [ '$max', '$min', '$sum', '$avg' ]
 
 def dont_redact_val?(key)
   return VAL_OK.include?(key)
 end
 
+# Don't redact the subdocuments for these operations
 SUBDOC_OK = [ '$sort', '$project' ]
 
 def dont_redact_subdoc?(key)
   return SUBDOC_OK.include?(key)
 end
 
-
+# Check if the operation contains an object type
+# TODO - Add support for more datatypes like BinData and TimeStamp
 def contains_object?(s)
-  object_detect = Regexp.new("[ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\)]")
-  return object_detect.match?(s)
+  return s =~ /(ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\))/
 end
 
+# If the string matches an object type, try to
+# redact the contents instead of the whole value
 def redact_object(s)
   if s =~ /new\s+Date\(\d+\)/
     return "new Date()"
   elsif s =~ /^\$+\w+/
     return s
   else
-    return '<redacted>'
+    return '<:>'
   end
 end
 
 def redact_string(s)
-  if dont_redact_val?(s)
-    return s
-  elsif contains_object?(s)
-    return redact_object(s)
-  else
-    "<>"
-  end
+  return contains_object?(s) ? redact_object(s) : "<:>"
 end
 
 def redact_innermost_parameters(pipeline)
@@ -128,7 +131,7 @@ def redact_innermost_parameters(pipeline)
   if not pipeline.is_a?(Hash)
     case pipeline
     when String
-      return "<redacted>"
+      return "<:>"
 
     when Float
       return -0.0
@@ -145,7 +148,7 @@ def redact_innermost_parameters(pipeline)
       when Float
         retval[k] = -0.0
       
-      when Integer        
+      when Integer
         retval[k] = dont_redact_val?(k) ? v : -0
 
       when Numeric
@@ -174,13 +177,9 @@ def redact_innermost_parameters(pipeline)
       when Hash
         # TODO: Needs to do partial redaction of $project in case
         # we have subdocuments/subexpressions in it
-        if dont_redact_subdoc?(k)
-          retval[k] = v
-        else
-          retval[k] = redact_innermost_parameters(v)
-        end
+        retval[k] = dont_redact_subdoc?(k) ? v : redact_innermost_parameters(v)
       else
-        retval[k] = [true, false].include? v ? 'bool' : 'redacted param'
+        retval[k] = [true, false].include?(v) ? 'bool' : '<:!:>'
       end
     end
   end
@@ -225,7 +224,7 @@ ARGF.each do |line|
   end
 end
 
-printf "%d overlength lines detected that were skipped\n", oversize_count
+printf "%d overlength lines detected and skipped\n\n", oversize_count
 
 sorted_output = []
 pipelines.each do |pipeline, stats|
