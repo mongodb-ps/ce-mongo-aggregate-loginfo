@@ -10,6 +10,27 @@ class Stats
   end
   attr_reader :num, :max, :output, :total
 end
+#
+#
+class PipelineInfo
+  def initialize(collection, pipeline)
+    @collection = collection
+    @pipeline   = pipeline
+  end
+  attr_reader :collection, :pipeline
+
+  def ==(rhs)
+    self.class === rhs and
+      @collection == rhs.collection and
+      @pipeline == rhs.pipeline
+  end
+
+  def hash
+    (@collection + @pipeline).hash
+  end
+
+  alias eql? ==
+end
 
 def match_square_brackets(str)
   r_i = 0
@@ -31,14 +52,17 @@ def match_square_brackets(str)
   return str[0..r_i]
 end
 
-def format_stats(pipeline, exec_times)
+def format_stats(pipeline, exec_times, max_coll_name_len, max_pl_len)
   exec_times.sort!
   min = exec_times[0]
   max = exec_times[exec_times.size - 1]
   tot = exec_times.inject(0.0) { | sum, val | sum + val }
   avg = tot / exec_times.size
 
-  output_line = sprintf("%s\t\t\t\t%d\t%d\t%d\t%.2f\t%d", pipeline, exec_times.size, min, max, avg, tot)
+  #output_line = sprintf("%s\t\t\t\t%d\t%d\t%d\t%.2f\t%d", pipeline, exec_times.size, min, max, avg, tot)
+  output_line = pipeline.collection + (' ' * (max_coll_name_len - pipeline.collection.length + 1)) +
+                "\t" + pipeline.pipeline + (' ' * (max_pl_len - pipeline.pipeline.length + 1)) +
+                sprintf("\t%10d\t%10d\t%10d\t%10.2f\t%10d", exec_times.size, min, max, avg, tot)
   return exec_times.size, max, tot, output_line
 end
 
@@ -138,6 +162,11 @@ oversize_count = 0
 
 pipeline_match = Regexp.new('(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_.+ (\d+))ms$)').freeze
 
+# TODO - make switchable via command line
+redact_parameters = true
+
+max_coll_len = max_pl_len = 0
+
 ARGF.each do |line|
   matches = pipeline_match.match(line)
   unless matches.nil? or matches.length == 0
@@ -149,13 +178,23 @@ ARGF.each do |line|
       json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
       #puts(json_conv)
       pl_hash = JSON.parse(json_conv)
-      #puts pl_hash
-      redacted_json = collection + "\t\t" + redact_innermost_parameters(pl_hash).to_json
 
-      if not pipelines.key?(redacted_json)
-        pipelines[redacted_json] = Array(exec_time.to_f)
+      json_output = redact_parameters ? redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
+
+      if max_coll_len < collection.length
+        max_coll_len = collection.length
+      end
+
+      if max_pl_len < json_output.length
+        max_pl_len = json_output.length
+      end
+
+      pl_key = PipelineInfo.new(collection, json_output)
+      
+      if not pipelines.key?(pl_key)
+        pipelines[pl_key] = Array(exec_time.to_f)
       else
-        pipelines[redacted_json].push(exec_time.to_f)
+        pipelines[pl_key].push(exec_time.to_f)
       end
     else
       oversize_count += 1
@@ -167,10 +206,10 @@ printf "%d overlength lines detected that were skipped\n", oversize_count
 
 sorted_output = []
 pipelines.each do |pipeline, stats|
-  num_exec, max, tot, output = format_stats(pipeline, stats)
+  num_exec, max, tot, output = format_stats(pipeline, stats, max_coll_len, max_pl_len)
   sorted_output.push(Stats.new(num_exec, max, tot, output))
 end
 
-sorted = sorted_output.sort_by { | element | element.num }.reverse!
-puts "Namespace\t\tpipeline\t\t\t\tcount\tmin\tmax\taverage\ttotal"
+sorted = sorted_output.sort_by { | element | [ element.num, element.total ] }.reverse!
+puts 'Collection' + (' ' * [max_coll_len - 9, 1].max) + "\tPipeline" + (' ' * [max_pl_len - 7, 1].max) + "\t  count   \t  min     \t  max     \t average  \t total"
 sorted.each { | element | printf("%s\n",  element.output) }
