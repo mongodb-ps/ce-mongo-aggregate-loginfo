@@ -52,6 +52,7 @@ def match_square_brackets(str)
   return str[0..r_i]
 end
 
+STATS_FORMAT = "\t%10d\t%10d\t%10d\t%10.2f\t%10d"
 def format_stats(pipeline, exec_times, max_coll_name_len, max_pl_len)
   exec_times.sort!
   min = exec_times[0]
@@ -59,10 +60,9 @@ def format_stats(pipeline, exec_times, max_coll_name_len, max_pl_len)
   tot = exec_times.inject(0.0) { | sum, val | sum + val }
   avg = tot / exec_times.size
 
-  #output_line = sprintf("%s\t\t\t\t%d\t%d\t%d\t%.2f\t%d", pipeline, exec_times.size, min, max, avg, tot)
   output_line = pipeline.collection + (' ' * (max_coll_name_len - pipeline.collection.length + 1)) +
                 "\t" + pipeline.pipeline + (' ' * (max_pl_len - pipeline.pipeline.length + 1)) +
-                sprintf("\t%10d\t%10d\t%10d\t%10.2f\t%10d", exec_times.size, min, max, avg, tot)
+                sprintf(STATS_FORMAT, exec_times.size, min, max, avg, tot)
   return exec_times.size, max, tot, output_line
 end
 
@@ -75,16 +75,52 @@ def quote_json_keys(str)
   return quoted_object_types.gsub(/([a-zA-Z0-9_$\.]+):/, '"\1":')
 end
 
+PART_REDACT = [ '$eq', '$ne', '$gte', '$gt', '$lte', '$lt' ]
+
 def partial_redaction_only?(key)
-  return [ '$eq', '$ne', '$gte', '$gt', '$lte', '$lt' ].include?(key)
+  return PART_REDACT.include?(key)
 end
   
 def in_clause?(key)
   return key == "$in"
 end
 
+VAL_OK = [ '$max', '$min', '$sum', '$avg' ]
+
 def dont_redact_val?(key)
-  return [ '$max', '$min', '$sum', '$avg' ].include?(key)
+  return VAL_OK.include?(key)
+end
+
+SUBDOC_OK = [ '$sort', '$project' ]
+
+def dont_redact_subdoc?(key)
+  return SUBDOC_OK.include?(key)
+end
+
+
+def contains_object?(s)
+  object_detect = Regexp.new("[ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\)]")
+  return object_detect.match?(s)
+end
+
+def redact_object(s)
+  if s =~ /new\s+Date\(\d+\)/
+    return "new Date()"
+  elsif s =~ /^\$+\w+/
+    return s
+  else
+    return '<redacted>'
+  end
+end
+
+def redact_string(s)
+  if dont_redact_val?(s)
+    return s
+  elsif contains_object?(s)
+    return redact_object(s)
+  else
+    "<>"
+  end
 end
 
 def redact_innermost_parameters(pipeline)
@@ -104,17 +140,13 @@ def redact_innermost_parameters(pipeline)
     pipeline.each do |k,v|
       case v
       when String
-        if dont_redact_val?(k)
-          retval[k] = v
-        else
-          retval[k] = "redacted"
-        end
+        retval[k] = dont_redact_val?(k) ? v : redact_string(v)
 
       when Float
         retval[k] = -0.0
       
-      when Integer
-        retval[k] = 0
+      when Integer        
+        retval[k] = dont_redact_val?(k) ? v : -0
 
       when Numeric
         retval[k] = 0
@@ -142,13 +174,13 @@ def redact_innermost_parameters(pipeline)
       when Hash
         # TODO: Needs to do partial redaction of $project in case
         # we have subdocuments/subexpressions in it
-        if k == "$project"
+        if dont_redact_subdoc?(k)
           retval[k] = v
         else
           retval[k] = redact_innermost_parameters(v)
         end
       else
-        retval[k] = "redacted parameters"
+        retval[k] = [true, false].include? v ? 'bool' : 'redacted param'
       end
     end
   end
@@ -170,34 +202,25 @@ max_coll_len = max_pl_len = 0
 ARGF.each do |line|
   matches = pipeline_match.match(line)
   unless matches.nil? or matches.length == 0
-    #puts line
-    if not oversize_match.match?(line)
+    if oversize_match.match?(line)
+      oversize_count += 1
+    else
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
-      pipeline = collection + "\t\t" + match_square_brackets(pl)
-      #puts pipeline
-      json_conv = '{ ' + quote_json_keys(match_square_brackets(pl)) + ' }'
-      #puts(json_conv)
-      pl_hash = JSON.parse(json_conv)
+
+      pl_hash = JSON.parse('{ ' + quote_json_keys(match_square_brackets(pl)) + ' }')
 
       json_output = redact_parameters ? redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
 
-      if max_coll_len < collection.length
-        max_coll_len = collection.length
-      end
-
-      if max_pl_len < json_output.length
-        max_pl_len = json_output.length
-      end
+      max_coll_len = [ collection.length, max_coll_len ].max
+      max_pl_len = [ json_output.length, max_pl_len].max
 
       pl_key = PipelineInfo.new(collection, json_output)
       
-      if not pipelines.key?(pl_key)
-        pipelines[pl_key] = Array(exec_time.to_f)
-      else
+      if pipelines.key?(pl_key)
         pipelines[pl_key].push(exec_time.to_f)
+      else
+        pipelines[pl_key] = Array(exec_time.to_f)
       end
-    else
-      oversize_count += 1
     end
   end
 end
