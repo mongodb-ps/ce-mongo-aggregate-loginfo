@@ -6,7 +6,7 @@ The tool accepts a list of MongoDB log files on the command line. It will proces
 
 # How do I run it?
 
-First, you need to have ruby installed. I originally tested it with Ruby 2.3, but expect 2.3 and newer to work with the script.
+First, you need to have ruby installed. I originally tested it with Ruby 2.3, but expect 2.3 and newer to work with the script. Current development is on Ruby 2.6 and 2.7, as that's what I have easy access to.
 
 You can pipe the a log file into the script via stdin:
 

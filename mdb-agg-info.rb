@@ -1,5 +1,9 @@
+#!/usr/bin/env ruby
+
 require 'json'
 
+#
+# Accumulated statistics helper class
 #
 class Stats
   def initialize(num, max, tot, output)
