@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# coding: utf-8
 
 require 'json'
 
@@ -39,26 +40,28 @@ class PipelineInfo
 end
 
 def match_square_brackets(str)
-  r_i = 0
-  depth = 0
-  found_first = false
-  for i in 0...str.length
+  r_i = depth = 0
+  found_open = false
+  start = str.index('[')  # Note - we assume that the regex had a match on an opening/close [] so we skip a second check here
+  for i in start...str.length
     case str[i]
     when '['
       depth += 1
-      found_first = true
+      found_open = true
     when ']'
       depth -= 1
     end
-    if found_first and depth == 0
+    if found_open and depth == 0
       r_i = i
-      found_first = false
+      found_open = false
+      break
     end
   end
   return str[0..r_i]
 end
 
 STATS_FORMAT = "\t%10d\t%10d\t%10d\t%10.2f\t%10d"
+
 def format_stats(pipeline, exec_times, max_coll_name_len, max_pl_len)
   exec_times.sort!
   min = exec_times[0]
