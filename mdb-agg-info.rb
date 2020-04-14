@@ -11,6 +11,8 @@ class Stats
   attr_reader :num, :max, :output, :total
 end
 #
+# Aggregation pipelines are uniquely identified by a combination of
+# collection name and (redacted) pipeline
 #
 class PipelineInfo
   def initialize(collection, pipeline)
@@ -186,6 +188,29 @@ def redact_innermost_parameters(pipeline)
   return retval
 end
 
+def usage()
+  puts "Usage: mdb-agg-info [--help] [--exact-duplicates] <files>"
+  exit(1)
+end
+
+def process_argv()
+  redact = true
+  if ARGV.length > 0
+    ARGV.each do |arg|
+      case arg
+      when '--help'
+        usage()
+      when '--exact-duplicates'
+        redact = false
+        ARGV.delete('--exact-duplicates')
+      end
+    end
+  else
+    usage()
+  end
+  return redact
+end
+
 pipelines = {}
 
 oversize_match = Regexp.new('warning: log line attempted \(\d+kB\) over max size \(10kB\), printing beginning and end').freeze
@@ -193,10 +218,12 @@ oversize_count = 0
 
 pipeline_match = Regexp.new('(.+command\s+(\S+)\s+command:\s+aggregate\s+(\{\s+aggregate:\s+\"(.+)\",\s+(pipeline:\s+\[.*)protocol:op_.+ (\d+))ms$)').freeze
 
-# TODO - make switchable via command line
-redact_parameters = true
-
 max_coll_len = max_pl_len = 0
+
+redact_parameters = process_argv()
+unless redact_parameters
+  puts 'Running in exact duplicates mode'
+end
 
 ARGF.each do |line|
   matches = pipeline_match.match(line)
