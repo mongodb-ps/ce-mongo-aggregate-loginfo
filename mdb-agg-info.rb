@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# coding: utf-8
 
 require 'json'
 
@@ -115,13 +114,13 @@ end
 
 # Check if the operation contains an object type
 # TODO - Add support for more datatypes like BinData and TimeStamp
-def contains_object?(s)
-  return s =~ /(ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\))/
+def contains_object_or_variable?(s)
+  return s =~ /(ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\)|^\$+\w+)/
 end
 
 # If the string matches an object type, try to
 # redact the contents instead of the whole value
-def redact_object(s)
+def redact_object_or_variable(s)
   if s =~ /new\s+Date\(\d+\)/
     return "new Date()"
   elsif s =~ /^\$+\w+/
@@ -132,7 +131,33 @@ def redact_object(s)
 end
 
 def redact_string(s)
-  return contains_object?(s) ? redact_object(s) : "<:>"
+  return contains_object_or_variable?(s) ? redact_object_or_variable(s) : "<:>"
+end
+
+# Check if the key for the subdocument implies that the subdocument
+# needs special treatment for redaction.
+def special_subdoc_redact?(k)
+  return [ '$lookup', '$graphLookup' ].include?(k)
+end
+
+def redact_special_functions(k, v)
+  case k
+  when '$lookup'
+    tmp_subdoc = {}
+    v.each do | k, v |
+      case k
+      when 'from'
+        tmp_subdoc['from'] = v
+      when 'let'
+        tmp_subdoc['let'] = redact_innermost_parameters(v)
+      else
+        tmp_subdoc[k] = v
+      end
+    end
+    return tmp_subdoc
+  when '$graphLookup'
+    return v
+  end
 end
 
 def redact_innermost_parameters(pipeline)
@@ -140,7 +165,7 @@ def redact_innermost_parameters(pipeline)
   if not pipeline.is_a?(Hash)
     case pipeline
     when String
-      return "<:>"
+      return redact_string(pipeline)
 
     when Float
       return -0.0
@@ -186,7 +211,13 @@ def redact_innermost_parameters(pipeline)
       when Hash
         # TODO: Needs to do partial redaction of $project in case
         # we have subdocuments/subexpressions in it
-        retval[k] = dont_redact_subdoc?(k) ? v : redact_innermost_parameters(v)
+        if dont_redact_subdoc?(k)
+          retval[k] = v
+        elsif special_subdoc_redact?(k)
+          retval[k] = redact_special_functions(k, v)
+        else
+          retval[k] = redact_innermost_parameters(v)
+        end
       else
         retval[k] = [true, false].include?(v) ? 'bool' : '<:!:>'
       end
@@ -267,5 +298,5 @@ pipelines.each do |pipeline, stats|
 end
 
 sorted = sorted_output.sort_by { | element | [ element.num, element.total ] }.reverse!
-puts 'Collection' + (' ' * [max_coll_len - 9, 1].max) + "\tPipeline" + (' ' * [max_pl_len - 7, 1].max) + "\t  count   \t  min     \t  max     \t average  \t total"
+puts 'Collection' + (' ' * [max_coll_len - 9, 1].max) + "\tPipeline" + (' ' * [max_pl_len - 7, 1].max) + "\t  count   \t  min (ms)\t  max (ms)\t average  \t total"
 sorted.each { | element | printf("%s\n",  element.output) }
