@@ -8,12 +8,12 @@ First, you need to have ruby installed. I originally tested it with Ruby 2.3, bu
 
 You can pipe the a log file into the script via stdin:
 
-`cat mongo.log | ruby get-agg-pipelines.rb`
+`cat mongo.log | ruby mdb-agg-info.rb`
 
 Alternatively, you can point it at a log file:
 
-`ruby get-agg-pipelines.rb mongod.log`
+`ruby mdb-agg-info.rb mongod.log`
 
 # Environment considerations
 
-The script was only tested against MongoDB 4.0.
+The script was only tested against MongoDB 4.0 and 3.6.
