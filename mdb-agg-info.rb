@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 
 require 'json'
-require './helpers.rb'
-require './text_utils.rb'
-require './agg_redact_utils.rb'
+require_relative 'helpers.rb'
+require_relative 'text_utils.rb'
+require_relative 'agg_redact_utils.rb'
 
 STATS_FORMAT = "\t%10d\t%10d\t%10d\t%10.2f\t%10d"
 
@@ -66,9 +66,9 @@ ARGF.each do |line|
     else
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
 
-      pl_hash = JSON.parse('{ ' + quote_json_keys(match_square_brackets(pl)) + ' }')
+      pl_hash = JSON.parse('{ ' + RedactHelpers.quote_json_keys(match_square_brackets(pl)) + ' }')
 
-      json_output = redact_parameters ? redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
+      json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
 
       max_coll_len = [ collection.length, max_coll_len ].max
       max_pl_len = [ json_output.length, max_pl_len].max
@@ -84,7 +84,9 @@ ARGF.each do |line|
   end
 end
 
-printf "%d overlength lines detected and skipped\n\n", oversize_count
+unless oversize_count == 0
+  printf "%d overlength lines detected and skipped\n\n", oversize_count
+end
 
 sorted_output = []
 pipelines.each do |pipeline, stats|
