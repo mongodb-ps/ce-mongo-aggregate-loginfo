@@ -43,5 +43,6 @@ RSpec.describe RedactHelpers do
   end
   
   it 'will redact $graphLookup' do
+    expect(RedactHelpers.redact_innermost_parameters({ '$graphLookup' => { 'from' => "employees", 'startWith' => "$reportsTo", 'connectFromField' => "reportsTo", 'connectToField' => "name", 'as' => "reportingHierarchy" } })).to eq({ '$graphLookup' => { 'from' => "employees", 'startWith' => "$reportsTo", 'connectFromField' => "reportsTo", 'connectToField' => "name", 'as' => "reportingHierarchy" } })
   end
 end
