@@ -79,6 +79,12 @@ module RedactHelpers
           tmp_subdoc['from'] = v
         when 'let'
           tmp_subdoc['let'] = redact_innermost_parameters(v)
+        when 'pipeline'
+          redacted = []
+          v.each do |entry|
+            redacted.push(redact_innermost_parameters(entry))
+          end
+          tmp_subdoc['pipeline'] = redacted
         else
           tmp_subdoc[k] = v
         end
