@@ -66,7 +66,7 @@ ARGF.each do |line|
     else
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
 
-      pl_hash = JSON.parse('{ ' + RedactHelpers.quote_json_keys(match_square_brackets(pl)) + ' }')
+      pl_hash = JSON.parse('{ ' + RedactHelpers.quote_json_keys(TextUtils.match_square_brackets(pl)) + ' }')
 
       json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
 

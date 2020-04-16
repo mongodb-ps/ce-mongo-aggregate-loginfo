@@ -1,6 +1,5 @@
-#require 'spec_helper'
-
 require_relative '../agg_redact_utils'
+require_relative '../text_utils'
 
 RSpec.describe RedactHelpers do
   it 'will redact this string' do
@@ -44,5 +43,10 @@ RSpec.describe RedactHelpers do
   
   it 'will redact $graphLookup' do
     expect(RedactHelpers.redact_innermost_parameters({ '$graphLookup' => { 'from' => "employees", 'startWith' => "$reportsTo", 'connectFromField' => "reportsTo", 'connectToField' => "name", 'as' => "reportingHierarchy" } })).to eq({ '$graphLookup' => { 'from' => "employees", 'startWith' => "$reportsTo", 'connectFromField' => "reportsTo", 'connectToField' => "name", 'as' => "reportingHierarchy" } })
+  end
+end
+
+RSpec.describe TextUtils do
+  it 'will extract the correct pipeline substring' do
   end
 end
