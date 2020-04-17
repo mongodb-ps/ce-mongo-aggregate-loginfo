@@ -6,6 +6,8 @@ RSpec.describe RedactHelpers do
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { _id : ObjectId(\'5e99b89bb50408cbff36f9f0\') } } ]')).to eq('pipeline: [ { $match: { _id : "ObjectId(\'5e99b89bb50408cbff36f9f0\')" } } ]')    
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { _id : ObjectId("5e99b89bb50408cbff36f9f0") } } ]')).to eq('pipeline: [ { $match: { _id : "ObjectId(\'5e99b89bb50408cbff36f9f0\')" } } ]')    
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { mongo_rocks: BinData(128, 4D6F6E676F444220526F636B73) } } ]')).to eq('pipeline: [ { $match: { mongo_rocks: "BinData(128, 4D6F6E676F444220526F636B73)" } } ]')
+    expect(RedactHelpers.quote_object_types('created: { $gte: new Date(1578132000000), $lt: new Date(1586070000000) }')).to eq('created: { $gte: "new Date(1578132000000)", $lt: "new Date(1586070000000)" }')
+    expect(RedactHelpers.quote_object_types('created: { $gte: new Date("2020-01-03T15:36:00.001Z"), $lt: new Date(1586070000000) }')).to eq('created: { $gte: "new Date(2020-01-03T15:36:00.001Z)", $lt: "new Date(1586070000000)" }')
   end
   
   it 'will redact this string' do
@@ -15,8 +17,9 @@ RSpec.describe RedactHelpers do
   end
 
   it 'will correctly redact these object types' do
-    expect(RedactHelpers.redact_string('new Date("1066-01-01")')).to eq('new Dbate()')
+    expect(RedactHelpers.redact_string('new Date("1066-01-01")')).to eq('new Date()')
     expect(RedactHelpers.redact_string('ObjectId(\'5e99b89bb50408cbff36f9f0\')')).to eq('ObjectId()')
+    expect(RedactHelpers.redact_string('BinData(128, 4D6F6E676F444220526F636B73)')).to eq('BinData(128, <:>)')
   end
 
   it 'will redact these simple hashes' do
