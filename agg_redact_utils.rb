@@ -3,7 +3,15 @@ require 'json'
 
 module RedactHelpers
   def self.quote_object_types(str)
-    return str.gsub(/((ObjectId\('[a-f0-9]+'\))|(new Date\(\d+\)))/, '"\1"')
+    if str =~ /(ObjectId\('[a-f0-9]+'\))/
+      str.gsub(/(ObjectId\('[a-f0-9]+'\))/, '"\1"')
+    elsif str =~ /(ObjectId\("[a-f0-9]+"\))/
+      str.gsub(/(ObjectId\("([a-f0-9]+)"\))/, '"ObjectId(\'\2\')"')
+    elsif str =~ /(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/
+      str.gsub(/(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/, '"\1"')
+    else
+      str
+    end
   end
 
   def self.quote_json_keys(str)

@@ -2,6 +2,12 @@ require_relative '../agg_redact_utils'
 require_relative '../text_utils'
 
 RSpec.describe RedactHelpers do
+  it 'will correctly quotes special MongoDB object types' do
+    expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { _id : ObjectId(\'5e99b89bb50408cbff36f9f0\') } } ]')).to eq('pipeline: [ { $match: { _id : "ObjectId(\'5e99b89bb50408cbff36f9f0\')" } } ]')    
+    expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { _id : ObjectId("5e99b89bb50408cbff36f9f0") } } ]')).to eq('pipeline: [ { $match: { _id : "ObjectId(\'5e99b89bb50408cbff36f9f0\')" } } ]')    
+    expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { mongo_rocks: BinData(128, 4D6F6E676F444220526F636B73) } } ]')).to eq('pipeline: [ { $match: { mongo_rocks: "BinData(128, 4D6F6E676F444220526F636B73)" } } ]')
+  end
+  
   it 'will redact this string' do
     expect(RedactHelpers.redact_string('blahblah')).to eq('<:>')
     expect(RedactHelpers.redact_string('$myField')).to eq('$myField')
