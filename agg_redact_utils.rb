@@ -57,12 +57,14 @@ module RedactHelpers
   # If the string matches an object type, try to
   # redact the contents instead of the whole value
   def self.redact_object_or_variable(s)
-    if s =~ /new\s+Date\(\d+\)/
-      return "new Date()"
+    if s =~ /new\s+Date\(["'\d\:\.TZ-]+\)/
+      "new Date()"
+    elsif s =~ /ObjectId\(.+\)/
+      'ObjectId()'
     elsif s =~ /^\$+\w+/
-      return s
+      s
     else
-      return '<:>'
+      '<:>'
     end
   end
 

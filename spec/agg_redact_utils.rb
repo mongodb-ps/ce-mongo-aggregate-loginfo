@@ -14,6 +14,11 @@ RSpec.describe RedactHelpers do
     expect(RedactHelpers.redact_string('$$myVariable')).to eq('$$myVariable')
   end
 
+  it 'will correctly redact these object types' do
+    expect(RedactHelpers.redact_string('new Date("1066-01-01")')).to eq('new Dbate()')
+    expect(RedactHelpers.redact_string('ObjectId(\'5e99b89bb50408cbff36f9f0\')')).to eq('ObjectId()')
+  end
+
   it 'will redact these simple hashes' do
     expect(RedactHelpers.redact_innermost_parameters({ 'test' => 'blahblah' })).to eq({ 'test' => '<:>' })
     expect(RedactHelpers.redact_innermost_parameters({ 'test' => 0.0 })).to eq({ 'test' => -0.0 })
