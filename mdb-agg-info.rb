@@ -1,64 +1,9 @@
 #!/usr/bin/env ruby
-# coding: utf-8
 
 require 'json'
-
-#
-# Accumulated statistics helper class
-#
-class Stats
-  def initialize(num, max, tot, output)
-    @num = num
-    @max = max
-    @output = output
-    @total = tot
-  end
-  attr_reader :num, :max, :output, :total
-end
-#
-# Aggregation pipelines are uniquely identified by a combination of
-# collection name and (redacted) pipeline
-#
-class PipelineInfo
-  def initialize(collection, pipeline)
-    @collection = collection
-    @pipeline   = pipeline
-  end
-  attr_reader :collection, :pipeline
-
-  def ==(rhs)
-    self.class === rhs and
-      @collection == rhs.collection and
-      @pipeline == rhs.pipeline
-  end
-
-  def hash
-    (@collection + @pipeline).hash
-  end
-
-  alias eql? ==
-end
-
-def match_square_brackets(str)
-  r_i = depth = 0
-  found_open = false
-  start = str.index('[')  # Note - we assume that the regex had a match on an opening/close [] so we skip a second check here
-  for i in start...str.length
-    case str[i]
-    when '['
-      depth += 1
-      found_open = true
-    when ']'
-      depth -= 1
-    end
-    if found_open and depth == 0
-      r_i = i
-      found_open = false
-      break
-    end
-  end
-  return str[0..r_i]
-end
+require_relative 'helpers.rb'
+require_relative 'text_utils.rb'
+require_relative 'agg_redact_utils.rb'
 
 STATS_FORMAT = "\t%10d\t%10d\t%10d\t%10.2f\t%10d"
 
@@ -75,125 +20,6 @@ def format_stats(pipeline, exec_times, max_coll_name_len, max_pl_len)
   return exec_times.size, max, tot, output_line
 end
 
-def quote_object_types(str)
-  return str.gsub(/((ObjectId\('[a-f0-9]+'\))|(new Date\(\d+\)))/, '"\1"')
-end
-
-def quote_json_keys(str)
-  quoted_object_types = quote_object_types(str)
-  return quoted_object_types.gsub(/([a-zA-Z0-9_$\.]+):/, '"\1":')
-end
-
-
-# Expressions that should only be partially redacted, ie
-# redact the value but not the field the operation works on
-PART_REDACT = [ '$eq', '$ne', '$gte', '$gt', '$lte', '$lt' ]
-
-def partial_redaction_only?(key)
-  return PART_REDACT.include?(key)
-end
-
-# Check if we're in an in clause
-def in_clause?(key)
-  return key == "$in"
-end
-
-# Usually these functions have fields as operands/values,
-# so don't redact them
-VAL_OK = [ '$max', '$min', '$sum', '$avg' ]
-
-def dont_redact_val?(key)
-  return VAL_OK.include?(key)
-end
-
-# Don't redact the subdocuments for these operations
-SUBDOC_OK = [ '$sort', '$project' ]
-
-def dont_redact_subdoc?(key)
-  return SUBDOC_OK.include?(key)
-end
-
-# Check if the operation contains an object type
-# TODO - Add support for more datatypes like BinData and TimeStamp
-def contains_object?(s)
-  return s =~ /(ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\))/
-end
-
-# If the string matches an object type, try to
-# redact the contents instead of the whole value
-def redact_object(s)
-  if s =~ /new\s+Date\(\d+\)/
-    return "new Date()"
-  elsif s =~ /^\$+\w+/
-    return s
-  else
-    return '<:>'
-  end
-end
-
-def redact_string(s)
-  return contains_object?(s) ? redact_object(s) : "<:>"
-end
-
-def redact_innermost_parameters(pipeline)
-  retval = {}
-  if not pipeline.is_a?(Hash)
-    case pipeline
-    when String
-      return "<:>"
-
-    when Float
-      return -0.0
-
-    when Integer
-      return -0
-    end
-  else
-    pipeline.each do |k,v|
-      case v
-      when String
-        retval[k] = dont_redact_val?(k) ? v : redact_string(v)
-
-      when Float
-        retval[k] = -0.0
-      
-      when Integer
-        retval[k] = dont_redact_val?(k) ? v : -0
-
-      when Numeric
-        retval[k] = 0
-      
-      when Array
-        retarr = []
-        if partial_redaction_only?(k)
-          retarr.push(v[0])
-          v.drop(1).each { |val| retarr.push(redact_innermost_parameters(val)) }
-        elsif in_clause?(k)
-          last_val = redact_innermost_parameters(v[0])
-          retarr.push(last_val)
-          v.drop(1).each do |val|
-            cur_val = redact_innermost_parameters(val)
-            if last_val != cur_val
-              last_val = cur_val
-              retarr.push(cur_val)
-            end
-          end
-        else
-          v.each { |val| retarr.push(redact_innermost_parameters(val)) }
-        end
-        retval[k] = retarr
-      
-      when Hash
-        # TODO: Needs to do partial redaction of $project in case
-        # we have subdocuments/subexpressions in it
-        retval[k] = dont_redact_subdoc?(k) ? v : redact_innermost_parameters(v)
-      else
-        retval[k] = [true, false].include?(v) ? 'bool' : '<:!:>'
-      end
-    end
-  end
-  return retval
-end
 
 def usage()
   puts "Usage: mdb-agg-info [--help] [--exact-duplicates] <files>"
@@ -240,9 +66,9 @@ ARGF.each do |line|
     else
       all, namespace, aggregate, collection, pl, exec_time = matches.captures
 
-      pl_hash = JSON.parse('{ ' + quote_json_keys(match_square_brackets(pl)) + ' }')
+      pl_hash = JSON.parse('{ ' + RedactHelpers.quote_json_keys(TextUtils.match_square_brackets(pl)) + ' }')
 
-      json_output = redact_parameters ? redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
+      json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
 
       max_coll_len = [ collection.length, max_coll_len ].max
       max_pl_len = [ json_output.length, max_pl_len].max
@@ -258,7 +84,9 @@ ARGF.each do |line|
   end
 end
 
-printf "%d overlength lines detected and skipped\n\n", oversize_count
+unless oversize_count == 0
+  printf "%d overlength lines detected and skipped\n\n", oversize_count
+end
 
 sorted_output = []
 pipelines.each do |pipeline, stats|
@@ -267,5 +95,5 @@ pipelines.each do |pipeline, stats|
 end
 
 sorted = sorted_output.sort_by { | element | [ element.num, element.total ] }.reverse!
-puts 'Collection' + (' ' * [max_coll_len - 9, 1].max) + "\tPipeline" + (' ' * [max_pl_len - 7, 1].max) + "\t  count   \t  min     \t  max     \t average  \t total"
+puts 'Collection' + (' ' * [max_coll_len - 9, 1].max) + "\tPipeline" + (' ' * [max_pl_len - 7, 1].max) + "\t  count   \t  min (ms)\t  max (ms)\t average  \t total"
 sorted.each { | element | printf("%s\n",  element.output) }
