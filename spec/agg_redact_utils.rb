@@ -1,3 +1,4 @@
+# coding: utf-8
 require_relative '../agg_redact_utils'
 require_relative '../text_utils'
 
@@ -8,6 +9,16 @@ RSpec.describe RedactHelpers do
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { mongo_rocks: BinData(128, 4D6F6E676F444220526F636B73) } } ]')).to eq('pipeline: [ { $match: { mongo_rocks: "BinData(128, 4D6F6E676F444220526F636B73)" } } ]')
     expect(RedactHelpers.quote_object_types('created: { $gte: new Date(1578132000000), $lt: new Date(1586070000000) }')).to eq('created: { $gte: "new Date(1578132000000)", $lt: "new Date(1586070000000)" }')
     expect(RedactHelpers.quote_object_types('created: { $gte: new Date("2020-01-03T15:36:00.001Z"), $lt: new Date(1586070000000) }')).to eq('created: { $gte: "new Date(2020-01-03T15:36:00.001Z)", $lt: "new Date(1586070000000)" }')
+  end
+
+  it 'will correctly quote this string that contains a colon' do
+    expect(RedactHelpers.quote_json_keys('{ "mongodb-conn": "my-mongo-server:27107" }')).to eq('{ "mongodb-conn": "my-mongo-server:27107" }')
+    expect(RedactHelpers.quote_json_keys('{ mongodb-conn: "my-mongo-server:27107" }')).to eq('{ "mongodb-conn": "my-mongo-server:27107" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0 }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0 }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date(12435056000) }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0, "last_updated": "new Date(12435056000)" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date("2010-10-10T13:01:01Z") }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0, "last_updated": "new Date(2010-10-10T13:01:01Z)" }')
   end
   
   it 'will redact this string' do
