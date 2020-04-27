@@ -3,12 +3,20 @@ require 'json'
 
 module RedactHelpers
   def self.quote_object_types(str)
-    return str.gsub(/((ObjectId\('[a-f0-9]+'\))|(new Date\(\d+\)))/, '"\1"')
+    if str =~ /(ObjectId\(["'][a-f0-9]+['"]\))/
+      str.gsub(/ObjectId\(['"]([a-f0-9]+)['"]\)/, '"ObjectId(\'\1\')"')
+    elsif str =~ /(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/
+      str.gsub(/(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/, '"\1"')
+    elsif str =~/new Date\(.+\)/
+      str.gsub(/(new Date\(['"]*([\d\-\.:TZ]+)['"]*\))/, '"new Date(\2)"')
+    else
+      str
+    end
   end
 
   def self.quote_json_keys(str)
     quoted_object_types = quote_object_types(str)
-    return quoted_object_types.gsub(/([a-zA-Z0-9_$\.]+):/, '"\1":')
+    return quoted_object_types.gsub(/([{,]\s*)([\w-]+)(\s*:\s*["\d])/, '\1"\2"\3')
   end
 
 
@@ -43,18 +51,22 @@ module RedactHelpers
   # Check if the operation contains an object type
   # TODO - Add support for more datatypes like BinData and TimeStamp
   def self.contains_object_or_variable?(s)
-    return s =~ /(ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\)|^\$+\w+)/
+    return s =~ /(ObjectId\(.+\)|new Date\(.+\)|new NumberDecimal\(.+\)|BinData\(.+\)|^\$+\w+)/
   end
 
   # If the string matches an object type, try to
   # redact the contents instead of the whole value
   def self.redact_object_or_variable(s)
-    if s =~ /new\s+Date\(\d+\)/
-      return "new Date()"
+    if s =~ /new\s+Date\(["'\d\:\.TZ-]+\)/
+      "new Date()"
+    elsif s =~ /ObjectId\(.+\)/
+      'ObjectId()'
     elsif s =~ /^\$+\w+/
-      return s
+      s
+    elsif s =~ /BinData\(.+\)/
+      s.gsub(/BinData\((\d+),\s*[a-zA-Z0-9=\+\/]+\)/, 'BinData(\1, <:>)')
     else
-      return '<:>'
+      '<:>'
     end
   end
 
