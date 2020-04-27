@@ -15,6 +15,7 @@ RSpec.describe RedactHelpers do
     expect(RedactHelpers.quote_json_keys('{ "mongodb-conn": "my-mongo-server:27107" }')).to eq('{ "mongodb-conn": "my-mongo-server:27107" }')
     expect(RedactHelpers.quote_json_keys('{ mongodb-conn: "my-mongo-server:27107" }')).to eq('{ "mongodb-conn": "my-mongo-server:27107" }')
     expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics" }')
+    expect(RedactHelpers.quote_json_keys('{ namespace : "just random data", from_host: "my-mongo_server:27108" }')).to eq('{ "namespace" : "just random data", "from_host": "my-mongo_server:27108" }')
     expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics" }')
     expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0 }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0 }')
     expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date(12435056000) }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0, "last_updated": "new Date(12435056000)" }')
