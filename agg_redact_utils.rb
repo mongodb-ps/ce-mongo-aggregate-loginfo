@@ -16,7 +16,8 @@ module RedactHelpers
 
   def self.quote_json_keys(str)
     quoted_object_types = quote_object_types(str)
-    return quoted_object_types.gsub(/([{,]\s*)([\w-]+)(\s*:\s*["\d])/, '\1"\2"\3')
+#    return quoted_object_types.gsub(/([{,]\s*)([\w-]+)(\s*:\s*["\d])/, '\1"\2"\3')
+    return quoted_object_types.gsub(/([{,]\s*)([$\w-]+)(\s*:\s*)/, '\1"\2"\3')
   end
 
 

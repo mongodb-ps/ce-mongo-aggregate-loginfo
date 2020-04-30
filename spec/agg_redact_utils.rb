@@ -3,6 +3,10 @@ require_relative '../agg_redact_utils'
 require_relative '../text_utils'
 
 RSpec.describe RedactHelpers do
+  it 'will correctly quote this pipeline expression' do
+    expect(RedactHelpers.quote_json_keys('{ pipeline: [ { $match: { test_array: { $exists: true, $ne: [] } } }, { $group: { "_id": 1, n: { $sum: 1 } } } ] }')).to eq('{ "pipeline": [ { "$match": { "test_array": { "$exists": true, "$ne": [] } } }, { "$group": { "_id": 1, "n": { "$sum": 1 } } } ] }')
+  end
+  
   it 'will correctly quotes special MongoDB object types' do
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { _id : ObjectId(\'5e99b89bb50408cbff36f9f0\') } } ]')).to eq('pipeline: [ { $match: { _id : "ObjectId(\'5e99b89bb50408cbff36f9f0\')" } } ]')    
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { _id : ObjectId("5e99b89bb50408cbff36f9f0") } } ]')).to eq('pipeline: [ { $match: { _id : "ObjectId(\'5e99b89bb50408cbff36f9f0\')" } } ]')    
