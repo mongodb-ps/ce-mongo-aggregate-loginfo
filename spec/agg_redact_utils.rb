@@ -5,6 +5,7 @@ require_relative '../text_utils'
 RSpec.describe RedactHelpers do
   it 'will correctly quote this pipeline expression' do
     expect(RedactHelpers.quote_json_keys('{ pipeline: [ { $match: { test_array: { $exists: true, $ne: [] } } }, { $group: { "_id": 1, n: { $sum: 1 } } } ] }')).to eq('{ "pipeline": [ { "$match": { "test_array": { "$exists": true, "$ne": [] } } }, { "$group": { "_id": 1, "n": { "$sum": 1 } } } ] }')
+    expect(RedactHelpers.quote_json_keys('{ $sort: { subdoc.first_field: -1, subdoc.second_field: -1 } }')).to eq('{ "$sort": { "subdoc.first_field": -1, "subdoc.second_field": -1 } }')
   end
   
   it 'will correctly quotes special MongoDB object types' do
@@ -13,6 +14,7 @@ RSpec.describe RedactHelpers do
     expect(RedactHelpers.quote_object_types('pipeline: [ { $match: { mongo_rocks: BinData(128, 4D6F6E676F444220526F636B73) } } ]')).to eq('pipeline: [ { $match: { mongo_rocks: "BinData(128, 4D6F6E676F444220526F636B73)" } } ]')
     expect(RedactHelpers.quote_object_types('created: { $gte: new Date(1578132000000), $lt: new Date(1586070000000) }')).to eq('created: { $gte: "new Date(1578132000000)", $lt: "new Date(1586070000000)" }')
     expect(RedactHelpers.quote_object_types('created: { $gte: new Date("2020-01-03T15:36:00.001Z"), $lt: new Date(1586070000000) }')).to eq('created: { $gte: "new Date(2020-01-03T15:36:00.001Z)", $lt: "new Date(1586070000000)" }')
+    expect(RedactHelpers.quote_object_types('$match: { _id : { $in: [ ObjectId("5e99b89bb50408cbff36f9f0") ] }, created: { $gte: new Date(1578132000000) } }')).to eq('$match: { _id : { $in: [ "ObjectId(\'5e99b89bb50408cbff36f9f0\')" ] }, created: { $gte: "new Date(1578132000000)" } }')
   end
 
   it 'will correctly quote this string that contains a colon' do

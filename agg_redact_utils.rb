@@ -4,20 +4,20 @@ require 'json'
 module RedactHelpers
   def self.quote_object_types(str)
     if str =~ /(ObjectId\(["'][a-f0-9]+['"]\))/
-      str.gsub(/ObjectId\(['"]([a-f0-9]+)['"]\)/, '"ObjectId(\'\1\')"')
-    elsif str =~ /(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/
-      str.gsub(/(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/, '"\1"')
-    elsif str =~/new Date\(.+\)/
-      str.gsub(/(new Date\(['"]*([\d\-\.:TZ]+)['"]*\))/, '"new Date(\2)"')
-    else
-      str
+      str = str.gsub(/ObjectId\(['"]([a-f0-9]+)['"]\)/, '"ObjectId(\'\1\')"')
     end
+    if str =~ /(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/
+      str = str.gsub(/(BinData\(\d+,\s*[a-zA-Z0-9=\+\/]+\))/, '"\1"')
+    end
+    if str =~/new Date\(.+\)/
+      str = str.gsub(/(new Date\(['"]*([\d\-\.:TZ]+)['"]*\))/, '"new Date(\2)"')
+    end
+    return str
   end
 
   def self.quote_json_keys(str)
     quoted_object_types = quote_object_types(str)
-#    return quoted_object_types.gsub(/([{,]\s*)([\w-]+)(\s*:\s*["\d])/, '\1"\2"\3')
-    return quoted_object_types.gsub(/([{,]\s*)([$\w-]+)(\s*:\s*)/, '\1"\2"\3')
+    return quoted_object_types.gsub(/([{,]\s*)([$\.\w-]+)(\s*:\s*)/, '\1"\2"\3')
   end
 
 
@@ -34,16 +34,16 @@ module RedactHelpers
     return key == "$in"
   end
 
-  # Usually these functions have fields as operands/values,
-  # so don't redact them
-  VAL_OK = [ '$max', '$min', '$sum', '$avg' ]
+  # Usually these functions have fields as operands/values or the values are
+  # significant (in the case of $exists) so don't redact them
+  VAL_OK = [ '$max', '$min', '$sum', '$avg', '$exists' ]
 
   def self.dont_redact_val?(key)
     return VAL_OK.include?(key)
   end
 
   # Don't redact the subdocuments for these operations
-  SUBDOC_OK = [ '$sort', '$project' ]
+  SUBDOC_OK = [ '$sort', '$project', '$group' ]
 
   def self.dont_redact_subdoc?(key)
     return SUBDOC_OK.include?(key)
