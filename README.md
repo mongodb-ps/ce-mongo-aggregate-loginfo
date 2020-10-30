@@ -27,4 +27,4 @@ Parameter | What it does
 
 # Environment considerations
 
-The script has tested with MongoDB 3.6 and 4.0 so far.
+The script has tested with MongoDB 3.6 and 4.0 so far, plus initial support for the JSON log file format used by MongoDB 4.4 has been added.
