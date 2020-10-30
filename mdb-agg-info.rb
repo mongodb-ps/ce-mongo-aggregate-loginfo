@@ -58,28 +58,58 @@ unless redact_parameters
   puts 'Running in exact duplicates mode'
 end
 
+is_json_log = false
+
 ARGF.each do |line|
-  matches = pipeline_match.match(line)
-  unless matches.nil? or matches.length == 0
-    if oversize_match.match?(line)
-      oversize_count += 1
+  if line.size > 0
+    # Check if the log file is in 4.4. JSON format
+    if is_json_log || line[0] == '{'
+      is_json_log = true
+      log_line = JSON.parse(line)
+      cmd = log_line.dig "attr", "command"
+
+      if cmd && cmd.key?('aggregate')
+        pl_hash   = cmd['pipeline']
+        namespace = log_line.dig 'attr','ns'
+        exec_time = log_line.dig 'attr','durationMillis'
+        
+        json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
+
+        max_coll_len = [ namespace.length, max_coll_len ].max
+        max_pl_len   = [ json_output.length, max_pl_len].max
+        
+        pl_key = PipelineInfo.new(namespace, json_output)
+
+        if pipelines.key?(pl_key)
+          pipelines[pl_key].push(exec_time)
+        else
+          pipelines[pl_key] = Array(exec_time)
+        end
+      end
     else
-      all, namespace, aggregate, collection, pl, exec_time = matches.captures
+      matches = pipeline_match.match(line)
+      unless matches.nil? or matches.length == 0
+        if oversize_match.match?(line)
+          oversize_count += 1
+        else
+          all, namespace, aggregate, collection, pl, exec_time = matches.captures
 
-      pl = RedactHelpers.quote_json_keys(' {' + TextUtils.match_square_brackets(pl) + ' }')
-      pl_hash = JSON.parse(pl)
+          pl = RedactHelpers.quote_json_keys(' {' + TextUtils.match_square_brackets(pl) + ' }')
+          pl_hash = JSON.parse(pl)
 
-      json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
+          json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
 
-      max_coll_len = [ collection.length, max_coll_len ].max
-      max_pl_len = [ json_output.length, max_pl_len].max
+          max_coll_len = [ collection.length, max_coll_len ].max
+          max_pl_len = [ json_output.length, max_pl_len].max
 
-      pl_key = PipelineInfo.new(collection, json_output)
-      
-      if pipelines.key?(pl_key)
-        pipelines[pl_key].push(exec_time.to_f)
-      else
-        pipelines[pl_key] = Array(exec_time.to_f)
+          pl_key = PipelineInfo.new(collection, json_output)
+          
+          if pipelines.key?(pl_key)
+            pipelines[pl_key].push(exec_time.to_f)
+          else
+            pipelines[pl_key] = Array(exec_time.to_f)
+          end
+        end
       end
     end
   end

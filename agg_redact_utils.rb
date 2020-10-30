@@ -111,7 +111,15 @@ module RedactHelpers
   def self.redact_innermost_parameters(pipeline)
     retval = {}
     if not pipeline.is_a?(Hash)
+      # puts "Pipeline is " + pipeline.to_s + " and is of type " + pipeline.class.to_s
       case pipeline
+      when Array
+        retval = Array.new()
+        pipeline.each { |element|
+          retval.push(redact_innermost_parameters(element))
+        }
+        return retval
+        
       when String
         return redact_string(pipeline)
 
@@ -120,10 +128,17 @@ module RedactHelpers
 
       when Integer
         return -0
+
+      when true, false
+        puts "bool value triggered"
+        return "bool"
       end
     else
       pipeline.each do |k,v|
         case v
+        when true, false
+          retval[k] = dont_redact_val?(k) ? v : "bool"
+          
         when String
           retval[k] = dont_redact_val?(k) ? v : redact_string(v)
 
@@ -167,6 +182,11 @@ module RedactHelpers
             retval[k] = redact_innermost_parameters(v)
           end
         else
+          if v.nil?
+            puts "Warning - nil value for key " + k
+          else
+            puts "Error - shouldn't have made it here with value " + v.to_s
+          end
           retval[k] = [true, false].include?(v) ? 'bool' : '<:!:>'
         end
       end
