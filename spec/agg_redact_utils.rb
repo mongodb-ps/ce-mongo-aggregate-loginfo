@@ -76,6 +76,11 @@ RSpec.describe RedactHelpers do
   it 'will redact $graphLookup' do
     expect(RedactHelpers.redact_innermost_parameters({ '$graphLookup' => { 'from' => "employees", 'startWith' => "$reportsTo", 'connectFromField' => "reportsTo", 'connectToField' => "name", 'as' => "reportingHierarchy" } })).to eq({ '$graphLookup' => { 'from' => "employees", 'startWith' => "$reportsTo", 'connectFromField' => "reportsTo", 'connectToField' => "name", 'as' => "reportingHierarchy" } })
   end
+
+  it 'will not redact boolean on $exists' do
+    expect(RedactHelpers.redact_innermost_parameters({ 'my_huge_array' => { '$exists' => true } })).to eq({ 'my_huge_array' => { '$exists' => true } })
+    expect(RedactHelpers.redact_innermost_parameters({ 'my_huge_array' => { '$exists' => false } })).to eq({ 'my_huge_array' => { '$exists' => false } })
+  end
 end
 
 RSpec.describe TextUtils do
