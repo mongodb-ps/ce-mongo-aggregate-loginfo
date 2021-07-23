@@ -95,6 +95,13 @@ ARGF.each do |line|
           all, namespace, aggregate, collection, pl, exec_time = matches.captures
 
           pl = RedactHelpers.quote_json_keys(' {' + TextUtils.match_square_brackets(pl) + ' }')
+          #
+          # $regex is a bit of a special case here as the log line doesn't include the value of $regex
+          # as a quoted string. If we run into this case we'll have to specifically quote the regex
+          #
+          if pl.include? '$regex'
+            pl = RedactHelpers.quote_regex(pl)
+          end
           pl_hash = JSON.parse(pl)
 
           json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json

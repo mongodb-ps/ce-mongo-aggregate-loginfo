@@ -20,7 +20,11 @@ module RedactHelpers
     return quoted_object_types.gsub(/([{,]\s*)([$\.\w-]+)(\s*:\s*)/, '\1"\2"\3')
   end
 
+  def self.quote_regex(str)
+    return str.gsub(/\"\$regex\":\s+(\/.*\/)/, '"$regex": "\1"')
+  end
 
+  
   # Expressions that should only be partially redacted, ie
   # redact the value but not the field the operation works on
   PART_REDACT = [ '$eq', '$ne', '$gte', '$gt', '$lte', '$lt' ]
