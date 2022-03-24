@@ -134,7 +134,7 @@ module RedactHelpers
         return -0
 
       when true, false
-        puts "bool value triggered"
+        #puts "bool value triggered"
         return "bool"
       end
     else
@@ -187,7 +187,8 @@ module RedactHelpers
           end
         else
           if v.nil?
-            puts "Warning - nil value for key " + k
+            #puts "Warning - nil value for key " + k
+            retval[k] = nil
           else
             puts "Error - shouldn't have made it here with value " + v.to_s
           end

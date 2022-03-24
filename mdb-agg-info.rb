@@ -93,7 +93,6 @@ ARGF.each do |line|
           oversize_count += 1
         else
           all, namespace, aggregate, collection, pl, exec_time = matches.captures
-
           pl = RedactHelpers.quote_json_keys(' {' + TextUtils.match_square_brackets(pl) + ' }')
           #
           # $regex is a bit of a special case here as the log line doesn't include the value of $regex
@@ -106,10 +105,10 @@ ARGF.each do |line|
 
           json_output = redact_parameters ? RedactHelpers.redact_innermost_parameters(pl_hash).to_json : pl_hash.to_json
 
-          max_coll_len = [ collection.length, max_coll_len ].max
+          max_coll_len = [ namespace.length, max_coll_len ].max
           max_pl_len = [ json_output.length, max_pl_len].max
 
-          pl_key = PipelineInfo.new(collection, json_output)
+          pl_key = PipelineInfo.new(namespace, json_output)
           
           if pipelines.key?(pl_key)
             pipelines[pl_key].push(exec_time.to_f)
