@@ -21,11 +21,11 @@ RSpec.describe RedactHelpers do
     expect(RedactHelpers.quote_json_keys('{ "mongodb-conn": "my-mongo-server:27107" }')).to eq('{ "mongodb-conn": "my-mongo-server:27107" }')
     expect(RedactHelpers.quote_json_keys('{ mongodb-conn: "my-mongo-server:27107" }')).to eq('{ "mongodb-conn": "my-mongo-server:27107" }')
     expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics" }')
-    expect(RedactHelpers.quote_json_keys('{ namespace : "just random data", from_host: "my-mongo_server:27108" }')).to eq('{ "namespace" : "just random data", "from_host": "my-mongo_server:27108" }')
-    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics" }')
-    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0 }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0 }')
-    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date(12435056000) }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0, "last_updated": "new Date(12435056000)" }')
-    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date("2010-10-10T13:01:01Z") }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose" : "analytics", "keys": 0, "last_updated": "new Date(2010-10-10T13:01:01Z)" }')
+    expect(RedactHelpers.quote_json_keys('{ namespace : "just random data", from_host: "my-mongo_server:27108" }')).to eq('{ "namespace": "just random data", "from_host": "my-mongo_server:27108" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics" }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose": "analytics" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0 }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose": "analytics", "keys": 0 }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date(12435056000) }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose": "analytics", "keys": 0, "last_updated": "new Date(12435056000)" }')
+    expect(RedactHelpers.quote_json_keys('{ "my-mongo-server:27107": "analytics", mongo-purpose : "analytics", keys: 0, last_updated: new Date("2010-10-10T13:01:01Z") }')).to eq('{ "my-mongo-server:27107": "analytics", "mongo-purpose": "analytics", "keys": 0, "last_updated": "new Date(2010-10-10T13:01:01Z)" }')
   end
   
   it 'will redact this string' do
@@ -80,6 +80,15 @@ RSpec.describe RedactHelpers do
   it 'will not redact boolean on $exists' do
     expect(RedactHelpers.redact_innermost_parameters({ 'my_huge_array' => { '$exists' => true } })).to eq({ 'my_huge_array' => { '$exists' => true } })
     expect(RedactHelpers.redact_innermost_parameters({ 'my_huge_array' => { '$exists' => false } })).to eq({ 'my_huge_array' => { '$exists' => false } })
+  end
+
+  it 'will properly escape field names with spaces' do
+    expect(RedactHelpers.quote_json_keys('{ pipeline: [{ $match: { FieldName With Spaces: 10, AnotherFieldname With Spaces : "spaces" } }] }')).to eq('{ "pipeline": [{ "$match": { "FieldName With Spaces": 10, "AnotherFieldname With Spaces": "spaces" } }] }')
+  end
+
+  it 'will properly escape field names with parentheses' do
+    expect(RedactHelpers.quote_json_keys('{ Field(Name): "FieldValue" }')).to eq('{ "Field(Name)": "FieldValue" }')
+    expect(RedactHelpers.quote_json_keys('{ Field (Name): "FieldValue" }')).to eq('{ "Field (Name)": "FieldValue" }')
   end
 end
 
