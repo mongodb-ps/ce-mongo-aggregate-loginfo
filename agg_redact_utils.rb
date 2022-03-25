@@ -188,7 +188,7 @@ module RedactHelpers
         else
           if v.nil?
             #puts "Warning - nil value for key " + k
-            retval[k] = nil
+            retval[k] = "null"
           else
             puts "Error - shouldn't have made it here with value " + v.to_s
           end
